@@ -9,6 +9,7 @@
 #include <iostream>
 #include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
+#include <std_msgs/String.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 
@@ -28,6 +29,8 @@ ros::Publisher imu_pub;
 ros::Publisher obstacle_distance_pub;
 ros::Publisher velocity_pub;
 ros::Publisher ultrasonic_pub;
+
+ros::Subscriber set_cam_sub;
 
 using namespace cv;
 
@@ -220,8 +223,45 @@ int my_callback(int data_type, int data_len, char *content)
     return 0;
 }
 
+void set_cam_callback(const std_msgs::String::ConstPtr& msg)
+{
+  std::string msg_str = msg->data.c_str();
+  ROS_INFO("set cam callback: [%s]", msg_str.c_str());
+
+  // if (msg_str == "vbus1") switch_cam_index(e_vbus1);
+  // if (msg_str == 'vbus2') switch_cam_index(e_vbus2);
+  // if (msg_str == 'vbus3') switch_cam_index(e_vbus3);
+  // if (msg_str == 'vbus4') switch_cam_index(e_vbus4);     
+  // if (msg_str == 'vbus5') switch_cam_index(e_vbus5);
+}
+
 #define RETURN_IF_ERR(err_code) { if( err_code ){ release_transfer(); \
 std::cout<<"Error: "<<(e_sdk_err_code)err_code<<" at "<<__LINE__<<","<<__FILE__<<std::endl; return -1;}}
+
+/* 
+  manages stopping/starting image transfer and resetting guidance config 
+  needed to update CAMERA_ID
+*/
+void switch_cam_index(e_vbus_index cam_index)
+{
+  int err_code = stop_transfer();
+  // RETURN_IF_ERR(err_code);
+  reset_config();
+
+  CAMERA_ID = cam_index;
+
+  select_greyscale_image(CAMERA_ID, true);
+  select_greyscale_image(CAMERA_ID, false);
+  select_depth_image(CAMERA_ID);
+
+  select_imu();
+  select_ultrasonic();
+  select_obstacle_distance();
+  select_velocity();
+
+  err_code = start_transfer();
+  // RETURN_IF_ERR(err_code);
+}
 
 int main(int argc, char** argv)
 {
@@ -249,6 +289,9 @@ int main(int argc, char** argv)
     velocity_pub  			= my_node.advertise<geometry_msgs::Vector3Stamped>("/guidance/velocity",1);
     obstacle_distance_pub	= my_node.advertise<sensor_msgs::LaserScan>("/guidance/obstacle_distance",1);
     ultrasonic_pub			= my_node.advertise<sensor_msgs::LaserScan>("/guidance/ultrasonic",1);
+
+    /* Custom subscriber to change CAMERA_ID */
+    set_cam_sub = my_node.subscribe("/guidance/set_cam", 1000, set_cam_callback);
 
     /* initialize guidance */
     reset_config();
