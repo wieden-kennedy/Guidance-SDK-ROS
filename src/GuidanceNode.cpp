@@ -223,18 +223,6 @@ int my_callback(int data_type, int data_len, char *content)
     return 0;
 }
 
-void set_cam_callback(const std_msgs::String::ConstPtr& msg)
-{
-  std::string msg_str = msg->data.c_str();
-  ROS_INFO("set cam callback: [%s]", msg_str.c_str());
-
-  // if (msg_str == "vbus1") switch_cam_index(e_vbus1);
-  // if (msg_str == 'vbus2') switch_cam_index(e_vbus2);
-  // if (msg_str == 'vbus3') switch_cam_index(e_vbus3);
-  // if (msg_str == 'vbus4') switch_cam_index(e_vbus4);     
-  // if (msg_str == 'vbus5') switch_cam_index(e_vbus5);
-}
-
 #define RETURN_IF_ERR(err_code) { if( err_code ){ release_transfer(); \
 std::cout<<"Error: "<<(e_sdk_err_code)err_code<<" at "<<__LINE__<<","<<__FILE__<<std::endl; return -1;}}
 
@@ -263,6 +251,18 @@ void switch_cam_index(e_vbus_index cam_index)
   // RETURN_IF_ERR(err_code);
 }
 
+void set_cam_callback(const std_msgs::String::ConstPtr& msg)
+{
+  std::string msg_str = msg->data;
+  ROS_INFO("set cam callback: [%s]", msg_str.c_str());
+
+  if (msg_str == "vbus1") switch_cam_index(e_vbus1);
+  if (msg_str == "vbus2") switch_cam_index(e_vbus2);
+  if (msg_str == "vbus3") switch_cam_index(e_vbus3);
+  if (msg_str == "vbus4") switch_cam_index(e_vbus4);     
+  if (msg_str == "vbus5") switch_cam_index(e_vbus5);
+}
+
 int main(int argc, char** argv)
 {
     if (argc < 2) {
@@ -278,10 +278,11 @@ int main(int argc, char** argv)
 			" 'q' to quit.");
 		return 0;
 	}
-	
+    	
     /* initialize ros */
     ros::init(argc, argv, "GuidanceNode");
     ros::NodeHandle my_node;
+    ROS_INFO("GuidanceNode starting up...");
     depth_image_pub			= my_node.advertise<sensor_msgs::Image>("/guidance/depth_image",1);
     left_image_pub			= my_node.advertise<sensor_msgs::Image>("/guidance/left_image",1);
     right_image_pub			= my_node.advertise<sensor_msgs::Image>("/guidance/right_image",1);
