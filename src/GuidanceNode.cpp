@@ -137,9 +137,9 @@ int my_callback(int data_type, int data_len, char *content)
     }
 
     // check for rear cam image
-    if ( data->m_greyscale_image_left[e_vbus1] )
+    if ( data->m_greyscale_image_left[e_vbus3] )
     {
-      memcpy(g_greyscale_image_left.data, data->m_greyscale_image_left[e_vbus1], IMAGE_SIZE);
+      memcpy(g_greyscale_image_left.data, data->m_greyscale_image_left[e_vbus3], IMAGE_SIZE);
       
       // publish /guidance/cam_rear greyscale image
       cv_bridge::CvImage rear_8;
@@ -151,9 +151,9 @@ int my_callback(int data_type, int data_len, char *content)
     }
 
     // check for bottom cam image
-    if ( data->m_greyscale_image_left[e_vbus1] )
+    if ( data->m_greyscale_image_left[e_vbus5] )
     {
-      memcpy(g_greyscale_image_left.data, data->m_greyscale_image_left[e_vbus1], IMAGE_SIZE);
+      memcpy(g_greyscale_image_left.data, data->m_greyscale_image_left[e_vbus5], IMAGE_SIZE);
       
       // publish /guidance/cam_bottom greyscale image
       cv_bridge::CvImage bottom_8;
