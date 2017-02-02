@@ -29,6 +29,9 @@ ros::Publisher imu_pub;
 ros::Publisher obstacle_distance_pub;
 ros::Publisher velocity_pub;
 ros::Publisher ultrasonic_pub;
+ros::Publisher cam_front_pub;
+ros::Publisher cam_rear_pub;
+ros::Publisher cam_bottom_pub;
 
 ros::Subscriber set_cam_sub;
 
@@ -117,6 +120,48 @@ int my_callback(int data_type, int data_len, char *content)
       right_8.header.stamp   = ros::Time::now();
       right_8.encoding     = sensor_msgs::image_encodings::MONO8;
       right_image_pub.publish(right_8.toImageMsg());
+    }
+
+    // check for front cam image
+    if ( data->m_greyscale_image_left[e_vbus1] )
+    {
+      memcpy(g_greyscale_image_left.data, data->m_greyscale_image_left[e_vbus1], IMAGE_SIZE);
+      
+      // publish /guidance/cam_front greyscale image
+      cv_bridge::CvImage front_8;
+      g_greyscale_image_left.copyTo(front_8.image);
+      front_8.header.frame_id  = "guidance";
+      front_8.header.stamp = ros::Time::now();
+      front_8.encoding   = sensor_msgs::image_encodings::MONO8;
+      cam_front_pub.publish(front_8.toImageMsg());
+    }
+
+    // check for rear cam image
+    if ( data->m_greyscale_image_left[e_vbus1] )
+    {
+      memcpy(g_greyscale_image_left.data, data->m_greyscale_image_left[e_vbus1], IMAGE_SIZE);
+      
+      // publish /guidance/cam_rear greyscale image
+      cv_bridge::CvImage rear_8;
+      g_greyscale_image_left.copyTo(rear_8.image);
+      rear_8.header.frame_id  = "guidance";
+      rear_8.header.stamp = ros::Time::now();
+      rear_8.encoding   = sensor_msgs::image_encodings::MONO8;
+      cam_rear_pub.publish(rear_8.toImageMsg());
+    }
+
+    // check for bottom cam image
+    if ( data->m_greyscale_image_left[e_vbus1] )
+    {
+      memcpy(g_greyscale_image_left.data, data->m_greyscale_image_left[e_vbus1], IMAGE_SIZE);
+      
+      // publish /guidance/cam_bottom greyscale image
+      cv_bridge::CvImage bottom_8;
+      g_greyscale_image_left.copyTo(bottom_8.image);
+      bottom_8.header.frame_id  = "guidance";
+      bottom_8.header.stamp = ros::Time::now();
+      bottom_8.encoding   = sensor_msgs::image_encodings::MONO8;
+      cam_bottom_pub.publish(bottom_8.toImageMsg());
     }
 
     if ( data->m_depth_image[CAMERA_ID] )
@@ -262,10 +307,12 @@ void switch_cam_index(e_vbus_index cam_index)
 
   select_greyscale_image(CAMERA_ID, true);
   select_greyscale_image(CAMERA_ID, false);
-  select_depth_image(CAMERA_ID);
+  // currently, we're not using depth image
+  // select_depth_image(CAMERA_ID);
 
   select_imu();
-  select_ultrasonic();
+  // currently, we're not using ultrasonic 
+  // select_ultrasonic();
   select_obstacle_distance();
   select_velocity();
 
@@ -273,16 +320,48 @@ void switch_cam_index(e_vbus_index cam_index)
   // RETURN_IF_ERR(err_code);
 }
 
+/*
+  Callback for the topic:
+    /guidance/set_cam
+
+  Rather than looking for a specific cam vbus id we're 
+  turning on 3 channels: front, rear and bottom
+*/
 void set_cam_callback(const std_msgs::String::ConstPtr& msg)
 {
   std::string msg_str = msg->data;
   ROS_INFO("set cam callback: [%s]", msg_str.c_str());
 
-  if (msg_str == "vbus1") switch_cam_index(e_vbus1);
-  if (msg_str == "vbus2") switch_cam_index(e_vbus2);
-  if (msg_str == "vbus3") switch_cam_index(e_vbus3);
-  if (msg_str == "vbus4") switch_cam_index(e_vbus4);     
-  if (msg_str == "vbus5") switch_cam_index(e_vbus5);
+  // stop and reset the DJI guidance sdk data transfer
+  stop_transfer();
+  reset_config();
+
+  // set manual exposure
+  exposure_param params;
+  params.m_is_auto_exposure = 0;
+  params.m_exposure_time = 7.5;
+  
+  // select camera data (use only left image):
+  // front
+  select_greyscale_image(e_vbus1, true);
+  params.m_camera_pair_index = e_vbus1;
+  set_exposure_param(&params);
+  // left
+  select_greyscale_image(e_vbus3, true);
+  params.m_camera_pair_index = e_vbus3;
+  set_exposure_param(&params);
+  // bottom
+  select_greyscale_image(e_vbus5, true);
+  params.m_camera_pair_index = e_vbus5;
+  set_exposure_param(&params);
+
+  // select other guidance data streams
+  select_imu();
+  select_obstacle_distance();
+  select_velocity();
+
+  // start guidance data
+  start_transfer();
 }
 
 int main(int argc, char** argv)
@@ -317,6 +396,11 @@ int main(int argc, char** argv)
 
   /* Custom subscriber to change CAMERA_ID */
   set_cam_sub = my_node.subscribe("/guidance/set_cam", 1000, set_cam_callback);
+
+  /* Custom publishers for simultaneous camera data */
+  cam_front_pub    = my_node.advertise<sensor_msgs::Image>("/guidance/cam_front",1);
+  cam_rear_pub     = my_node.advertise<sensor_msgs::Image>("/guidance/cam_rear",1);
+  cam_bottom_pub   = my_node.advertise<sensor_msgs::Image>("/guidance/cam_bottom",1);
 
   /* initialize guidance */
   reset_config();
